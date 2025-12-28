@@ -5,15 +5,259 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unity Park</title>
+    
+    <!-- Только Google Model Viewer -->
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-    <link rel="stylesheet" href="style.css">
+    
+    <!-- Three.js через ES Module (современный способ) -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.159.0/build/three.module.js"
+        }
+    }
+    </script>
+<body>
+
+        <style>
+        /* СТИЛИ ДЛЯ МОДЕЛЬНОГО ПРОСМОТРЩИКА - ВАЖНО! */
+        model-viewer {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            background-color: #f0f0f0;
+        }
+
+        /* Стили для 360° просмотрщика */
+        .panorama-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+        }
+
+        .panorama-container.active {
+            display: flex;
+        }
+
+        .panorama-header {
+            padding: 15px 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+            z-index: 1001;
+            position: relative;
+        }
+
+        .close-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px 15px;
+            border-radius: 50%;
+            transition: background 0.3s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        #panorama-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        #panorama {
+            flex: 1;
+            width: 100%;
+            height: calc(100vh - 60px);
+            position: relative;
+        }
+
+        /* Простой 360° просмотрщик */
+        .panorama-viewer {
+            width: 100%;
+            height: 100%;
+            background-size: auto 100%;
+            background-position: center;
+            background-repeat: repeat-x;
+            cursor: grab;
+            overflow: hidden;
+        }
+
+        .panorama-viewer:active {
+            cursor: grabbing;
+        }
+
+        /* Стили для индикатора 360° на хотспотах */
+        .panorama-badge {
+            display: inline-block;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            font-size: 8px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 6px;
+            vertical-align: middle;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Стили для хотспотов */
+        .Hotspot {
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 8px;
+            border: none;
+            box-sizing: border-box;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            color: rgba(0, 0, 0, 0.9);
+            display: block;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 10px;
+            font-weight: 600;
+            max-width: 200px;
+            overflow-wrap: break-word;
+            padding: 8px 12px;
+            position: absolute;
+            width: max-content;
+            height: max-content;
+            transform: translate3d(-50%, -50%, 0);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .Hotspot:hover {
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+            transform: translate3d(-50%, -50%, 0) scale(1.05);
+        }
+
+        .HotspotAnnotation {
+            display: inline-flex;
+            align-items: center;
+        }
+
+        /* Стили для экрана загрузки */
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            transition: opacity 0.5s;
+        }
+
+        #progress-bar {
+            width: 300px;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        #progress {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* Скрытие сообщения об ошибке AR */
+        .hide {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+
+        /* Информационная панель */
+        .info-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: none;
+            z-index: 100;
+        }
+
+        .info-panel.show {
+            display: block;
+        }
+        
+        /* Контролы для 360° просмотра */
+        .panorama-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 1001;
+        }
+        
+        .control-btn {
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        /* Фикс для body и html */
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
 </head>
 
-<body>
 
     <div id="loading-screen">
         <div id="progress-bar">
             <div id="progress"></div>
+        </div>
+    </div>
+
+    <!-- Контейнер для 360° панорам - УПРОЩЕННАЯ ВЕРСИЯ -->
+    <div id="panorama-viewer" class="panorama-container">
+        <div class="panorama-header">
+            <h3 id="panorama-title">360° Панорама</h3>
+            <button id="close-panorama" class="close-btn">✕</button>
+        </div>
+        <div id="panorama" class="panorama-viewer"></div>
+        <div class="panorama-controls">
+            <button id="pan-left" class="control-btn">←</button>
+            <button id="pan-right" class="control-btn">→</button>
+            <button id="reset-view" class="control-btn">Сбросить</button>
         </div>
     </div>
 
@@ -25,113 +269,70 @@
         <button id="ar-button" slot="ar-button">AR-режим</button>
         <div id="error" class="hide">AR is not supported on this device</div>
 
-        <button class="Hotspot" slot="hotspot-0"
-            data-position="-0.8341306653599536m 0.28009488100988156m 0.1374088850344517m"
-            data-normal="-0.6880540822355871m 0m 0.7256594104116227m"
-            data-target="-0.8341306653599536m 0.28009488100988156m 0.1374088850344517m" data-orbit="0deg 75deg 0.65m"
-            data-visibility-attribute="visible">
-            <div class="HotspotAnnotation">Многофункциональный комплекс</div>
-        </button>
-
         <button class="Hotspot" slot="hotspot-1"
             data-position="-0.9073734110678933m 0.1507534682750702m -0.2609223591867831m" data-normal="0m 1m 0m"
             data-target="-0.9073734110678933m 0.1507534682750702m -0.2609223591867831m" data-orbit="0deg 30deg 0.6m"
-            data-visibility-attribute="visible">
-            <div class="HotspotAnnotation">Конгрессно-выставочный центр</div>
-        </button>
-
-        <button class="Hotspot" slot="hotspot-2"
-            data-position="-1.3981310147283001m 0.14099830389022827m -0.33860894143058884m" data-normal="0m 1m 0m"
-            data-target="-1.3981310147283001m 0.14099830389022827m -0.33860894143058884m" data-orbit="0deg 30deg 0.6m"
-            data-visibility-attribute="visible">
-            <div class="HotspotAnnotation">Медицинская клиника</div>
-        </button>
-        <button class="Hotspot" slot="hotspot-3"
-            data-position="-0.6936487796720363m 0.14440646767616272m 0.23109995034220177m" data-normal="0m 1m 0m"
-            data-target="-0.6936487796720363m 0.14440646767616272m 0.23109995034220177m" data-orbit="0deg 30deg 0.6m"
-            data-visibility-attribute="visible">
-            <div class="HotspotAnnotation">Центр развития талантов</div>
-        </button>
-        <button class="Hotspot" slot="hotspot-4"
-            data-position="-1.6899643061933576m 0.14099830389022783m -0.5440687230644539m" data-normal="0m 1m 0m"
-            data-target="-1.6899643061933576m 0.14099830389022783m -0.5440687230644539m" data-orbit="0deg 30deg 0.6m"
-            data-visibility-attribute="visible">
-            <div class="HotspotAnnotation">ЦОД</div>
-        </button>
-        <button class="Hotspot" slot="hotspot-5"
-            data-position="0.10185626511489998m 0.11197992414236069m -0.20448414247594204m" data-normal="0m 1m 0m"
-            data-target="0.10185626511489998m 0.11197992414236069m -0.20448414247594204m" data-orbit="0deg 70deg 1.2m"
-            data-visibility-attribute="visible">
-            <div class="HotspotAnnotation">Университет</div>
-        </button>
-        <button class="Hotspot" slot="hotspot-6"
-            data-position="0.1162872537057664m 0.14492858610475645m -0.5361948848448144m"
-            data-normal="-0.23266213437379976m 0.9600522081485442m -0.1554608917307899m"
-            data-target="0.1162872537057664m 0.14492858610475645m -0.5361948848448144m" data-orbit="0deg 45deg 1m"
-            data-visibility-attribute="visible">
-            <div class="HotspotAnnotation">Технопарк</div>
-        </button>
-        <button class="Hotspot" slot="hotspot-7"
-            data-position="-0.32415145910321286m 0.12196581810712814m -0.2930662804687154m" data-normal="0m 1m 0m"
-            data-target="-0.32415145910321286m 0.12196581810712814m -0.2930662804687154m" data-orbit="0deg 30deg 0.6m"
-            data-visibility-attribute="visible">
-            <div class="HotspotAnnotation">Центр высоких биомедицинских технологий</div>
-        </button>
-        <button class="Hotspot" slot="hotspot-8"
-            data-position="0.6890299180626669m 0.14099830389022916m -0.39151255809403285m" data-normal="0m 1m 0m"
-            data-target="0.6890299180626669m 0.14099830389022916m -0.39151255809403285m" data-orbit="60deg 45deg 1m"
-            data-visibility-attribute="visible">
-            <div class="HotspotAnnotation">Офисы</div>
-        </button>
-        <button class="Hotspot" slot="hotspot-9"
-            data-position="0.6190484254006192m 0.14099830389022827m 0.09329007894976016m" data-normal="0m 1m 0m"
-            data-target="0.6190484254006192m 0.14099830389022827m 0.09329007894976016m" data-orbit="0deg 30deg 0.6m"
-            data-visibility-attribute="visible">
-            <div class="HotspotAnnotation">Инновационный детский сад</div>
-        </button>
-        <button class="Hotspot" slot="hotspot-10"
-            data-position="-1.7926717679419326m 0.14099830389022827m -0.07597399843985286m" data-normal="0m 1m 0m"
-            data-target="-1.7926717679419326m 0.14099830389022827m -0.07597399843985286m" data-orbit="0deg 30deg 0.6m"
-            data-visibility-attribute="visible">
-            <div class="HotspotAnnotation">Университетская школа</div>
-        </button>
-        <button class="Hotspot" slot="hotspot-11"
-            data-position="0.32389124502553945m 0.13799633531729683m 0.0811594994100906m"
-            data-normal="-0.32238858803485554m 0m 0.9466074150908032m"
-            data-target="0.32389124502553945m 0.13799633531729683m 0.0811594994100906m" data-orbit="0deg 30deg 0.6m"
-            data-visibility-attribute="visible">
-            <div class="HotspotAnnotation">Общежития</div>
-        </button>
-        <button class="Hotspot" slot="hotspot-12"
-            data-position="-0.39853284673157774m 0.12196581810712903m 0.09344994131107187m" data-normal="0m 1m 0m"
-            data-target="-0.39853284673157774m 0.12196581810712903m 0.09344994131107187m" data-orbit="0deg 30deg 0.6m"
-            data-visibility-attribute="visible">
-            <div class="HotspotAnnotation">Гостиница</div>
+            data-visibility-attribute="visible" data-panorama="panoramas/congress.jpg">
+            <div class="HotspotAnnotation">Конгрессно-выставочный центр<span class="panorama-badge">360°</span></div>
         </button>
 
     </model-viewer>
 
-    <!-- Логотипы
-    <img src="images/5sensar-logo.svg" alt="Logo Left" class="logo logo-left">
-    <img src="images/Unity-park-logo.svg" alt="Logo Right" class="logo logo-right"> -->
-
+    <!-- Информационная панель -->
+    <div id="info-panel" class="info-panel">
+        Кликните на метку для просмотра объекта. Значок 360° указывает на наличие панорамного обзора.
+    </div>
 
     <script>
+        // Инициализация элементов DOM
         let modelViewer = document.querySelector('#model-viewer');
         const loadingScreen = document.querySelector('#loading-screen');
         const progressBar = document.querySelector('#progress');
+        const panoramaContainer = document.getElementById('panorama-viewer');
+        const panoramaView = document.getElementById('panorama');
+        const closePanoramaBtn = document.getElementById('close-panorama');
+        const panoramaTitle = document.getElementById('panorama-title');
+        const infoPanel = document.getElementById('info-panel');
+        
+        // Элементы управления панорамой
+        const panLeftBtn = document.getElementById('pan-left');
+        const panRightBtn = document.getElementById('pan-right');
+        const resetViewBtn = document.getElementById('reset-view');
+        
+        // Переменные для управления панорамой
+        let currentPanoramaUrl = '';
+        let currentPanPosition = 0;
+        let isPanoramaOpen = false;
+        let isDragging = false;
+        let lastMouseX = 0;
+        
+        // Сохраняем начальные значения камеры
+        const defaultCameraTarget = modelViewer.cameraTarget;
+        const defaultCameraOrbit = modelViewer.cameraOrbit;
+        const defaultFieldOfView = modelViewer.fieldOfView;
+        
+        // Переменные для отслеживания, какая кнопка была нажата
+        let lastClickedHotspot = null;
 
+        // Обработка загрузки модели
         modelViewer.addEventListener('progress', (event) => {
             const progress = event.detail.totalProgress;
             progressBar.style.width = `${progress * 100}%`;
         });
 
         modelViewer.addEventListener('load', () => {
-            loadingScreen.style.display = 'none';
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+                // Показываем информационную панель на 5 секунд
+                infoPanel.classList.add('show');
+                setTimeout(() => {
+                    infoPanel.classList.remove('show');
+                }, 5000);
+            }, 500);
         });
-    </script>
 
-    <script>
+        // Обработка AR режима
         document.querySelector("#model-viewer").addEventListener('ar-status', (event) => {
             if (event.detail.status === 'failed') {
                 const error = document.querySelector("#error");
@@ -142,67 +343,180 @@
             }
         });
 
-
-
-    </script>
-
-    <script type="module">
-        const modelViewer2 = document.querySelector("#model-viewer");
-        // Сохраняем начальные значения камеры
-        const defaultCameraTarget = modelViewer2.cameraTarget;
-        const defaultCameraOrbit = modelViewer2.cameraOrbit;
-        const defaultFieldOfView = modelViewer2.fieldOfView;
-
-        // Переменные для отслеживания, какая кнопка была нажата
-        let lastClickedHotspot = null;
-
-
-        const annotationClicked = (annotation) => {
-            let dataset = annotation.dataset;
-
-            if (lastClickedHotspot === annotation) {
-                // Если нажата та же самая кнопка, возвращаем камеру в исходное состояние
-                modelViewer2.cameraTarget = defaultCameraTarget;
-                modelViewer2.cameraOrbit = defaultCameraOrbit;
-                modelViewer2.fieldOfView = defaultFieldOfView;
-            } else {
-                // Если нажата другая кнопка, приближаем камеру к новой цели
-                modelViewer.cameraTarget = dataset.target;
-                modelViewer.cameraOrbit = dataset.orbit;
-            }
-
-            // Обновляем информацию о последней нажатой кнопке
-            lastClickedHotspot = annotation;
-        };
-
-        modelViewer2.querySelectorAll('button').forEach((hotspot) => {
-            console.log(hotspot);
-            hotspot.addEventListener('click', () => annotationClicked(hotspot));
-        });
-    </script>
-
-    <style type="text/css">
-        .Hotspot {
-            background: rgba(255, 255, 255, 0.6);
-            /* Полупрозрачный белый фон */
-            border-radius: 4px;
-            border: none;
-            box-sizing: border-box;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
-            color: rgba(0, 0, 0, 0.8);
-            display: block;
-            font-family: Futura, Helvetica Neue, sans-serif;
-            font-size: 8px;
-            font-weight: 700;
-            max-width: 165px;
-            overflow-wrap: break-word;
-            padding: 0.5em 1em;
-            position: absolute;
-            width: max-content;
-            height: max-content;
-            transform: translate3d(-50%, -50%, 0);
+        // ПРОСТАЯ ФУНКЦИЯ ДЛЯ 360° ПАНОРАМЫ
+        function showPanorama(panoramaUrl, title) {
+            if (!panoramaUrl) return;
+            
+            currentPanoramaUrl = panoramaUrl;
+            currentPanPosition = 0;
+            
+            // Показываем контейнер
+            panoramaContainer.classList.add('active');
+            panoramaTitle.textContent = title + ' - 360° Панорама';
+            isPanoramaOpen = true;
+            
+            // Устанавливаем изображение как фон
+            panoramaView.style.backgroundImage = `url('${panoramaUrl}')`;
+            panoramaView.style.backgroundPosition = 'center';
+            
+            // Добавляем информацию в консоль для отладки
+            console.log('Загружаем панораму:', panoramaUrl);
         }
-    </style>
+
+        // Функция для закрытия 360° панорамы
+        function closePanorama() {
+            panoramaContainer.classList.remove('active');
+            isPanoramaOpen = false;
+            currentPanoramaUrl = '';
+            panoramaView.style.backgroundImage = '';
+        }
+
+        // Функция поворота панорамы
+        function rotatePanorama(delta) {
+            currentPanPosition += delta;
+            // Ограничиваем диапазон от -180 до 180 градусов
+            while (currentPanPosition > 180) currentPanPosition -= 360;
+            while (currentPanPosition < -180) currentPanPosition += 360;
+            
+            // Применяем смещение
+            panoramaView.style.backgroundPosition = `${50 + currentPanPosition / 3.6}% center`;
+        }
+
+        // Функция сброса вида
+        function resetPanoramaView() {
+            currentPanPosition = 0;
+            panoramaView.style.backgroundPosition = 'center';
+        }
+
+        // Обработчик клика на хотспот
+        function annotationClicked(annotation) {
+            // Если открыта панорама, сначала закрываем её
+            if (isPanoramaOpen) {
+                closePanorama();
+                return;
+            }
+            
+            const dataset = annotation.dataset;
+            const panoramaUrl = dataset.panorama;
+            
+            // Проверяем, есть ли панорама для этого хотспота
+            if (panoramaUrl) {
+                // Показываем 360° панораму
+                const title = annotation.querySelector('.HotspotAnnotation').textContent;
+                showPanorama(panoramaUrl, title.replace('360°', '').trim());
+            } else {
+                // Обычная обработка камеры
+                if (lastClickedHotspot === annotation) {
+                    // Если нажата та же самая кнопка, возвращаем камеру в исходное состояние
+                    modelViewer.cameraTarget = defaultCameraTarget;
+                    modelViewer.cameraOrbit = defaultCameraOrbit;
+                    modelViewer.fieldOfView = defaultFieldOfView;
+                    lastClickedHotspot = null;
+                } else {
+                    // Если нажата другая кнопка, приближаем камеру к новой цели
+                    modelViewer.cameraTarget = dataset.target;
+                    modelViewer.cameraOrbit = dataset.orbit;
+                    lastClickedHotspot = annotation;
+                }
+            }
+        }
+
+        // Обработчики мыши для панорамы
+        panoramaView.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            lastMouseX = e.clientX;
+            panoramaView.style.cursor = 'grabbing';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging || !isPanoramaOpen) return;
+            
+            const deltaX = e.clientX - lastMouseX;
+            lastMouseX = e.clientX;
+            
+            // Поворачиваем панораму в зависимости от движения мыши
+            rotatePanorama(deltaX * 0.5);
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            panoramaView.style.cursor = 'grab';
+        });
+
+        // Обработчики для сенсорных устройств
+        panoramaView.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            lastMouseX = e.touches[0].clientX;
+            e.preventDefault();
+        });
+
+        panoramaView.addEventListener('touchmove', (e) => {
+            if (!isDragging || !isPanoramaOpen) return;
+            
+            const deltaX = e.touches[0].clientX - lastMouseX;
+            lastMouseX = e.touches[0].clientX;
+            
+            rotatePanorama(deltaX);
+            e.preventDefault();
+        });
+
+        panoramaView.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+
+        // Обработчики кнопок управления
+        panLeftBtn.addEventListener('click', () => rotatePanorama(-30));
+        panRightBtn.addEventListener('click', () => rotatePanorama(30));
+        resetViewBtn.addEventListener('click', resetPanoramaView);
+
+        // Добавляем обработчики клика для всех хотспотов
+        document.querySelectorAll('.Hotspot').forEach((hotspot) => {
+            hotspot.addEventListener('click', (e) => {
+                e.stopPropagation(); // Предотвращаем всплытие события
+                annotationClicked(hotspot);
+            });
+        });
+
+        // Обработчик закрытия панорамы
+        closePanoramaBtn.addEventListener('click', closePanorama);
+
+        // Закрытие панорамы по нажатию Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isPanoramaOpen) {
+                closePanorama();
+            }
+        });
+
+        // Закрытие панорамы по клику вне панорамы
+        panoramaContainer.addEventListener('click', (e) => {
+            if (e.target === panoramaContainer) {
+                closePanorama();
+            }
+        });
+
+        // Дополнительная информация при наведении на хотспот
+        document.querySelectorAll('.Hotspot').forEach((hotspot) => {
+            const hasPanorama = hotspot.dataset.panorama;
+            
+            hotspot.addEventListener('mouseenter', () => {
+                if (hasPanorama) {
+                    hotspot.style.background = 'linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(240, 255, 240, 0.95))';
+                }
+            });
+            
+            hotspot.addEventListener('mouseleave', () => {
+                hotspot.style.background = '';
+            });
+        });
+
+        // Инициализация по загрузке страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Unity Park 3D Viewer loaded with 360° panorama support');
+            console.log('Hotspots with 360° panorama:', 
+                document.querySelectorAll('[data-panorama]').length);
+        });
+
+    </script>
 
 </body>
 
