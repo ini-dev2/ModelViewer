@@ -1,523 +1,538 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unity Park</title>
-    
-    <!-- Только Google Model Viewer -->
-    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-    
-    <!-- Three.js через ES Module (современный способ) -->
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.159.0/build/three.module.js"
-        }
-    }
-    </script>
-<body>
+<meta charset="UTF-8">
+<title>Unity Park</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-        <style>
-        /* СТИЛИ ДЛЯ МОДЕЛЬНОГО ПРОСМОТРЩИКА - ВАЖНО! */
-        model-viewer {
-            width: 100vw;
-            height: 100vh;
-            position: fixed;
-            top: 0;
-            left: 0;
-            z-index: 1;
-            background-color: #f0f0f0;
-        }
+<!-- model-viewer -->
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
-        /* Стили для 360° просмотрщика */
-        .panorama-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.95);
-            z-index: 1000;
-            display: none;
-            flex-direction: column;
-        }
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+}
 
-        .panorama-container.active {
-            display: flex;
-        }
+model-viewer {
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background-color: #f0f0f0;
+}
 
-        .panorama-header {
-            padding: 15px 20px;
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-            z-index: 1001;
-            position: relative;
-        }
+/* Стили для хотспотов */
+.Hotspot {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    color: #333;
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 12px;
+    position: absolute;
+    width: max-content;
+    height: max-content;
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.3s ease;
+}
 
-        .close-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            padding: 5px 15px;
-            border-radius: 50%;
-            transition: background 0.3s;
-        }
+.Hotspot:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: scale(1.05);
+}
 
-        .close-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
+.Hotspot span {
+    display: inline-block;
+    background: linear-gradient(45deg, #4CAF50, #45a049);
+    color: white;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-left: 5px;
+    font-weight: bold;
+}
 
-        #panorama-title {
-            margin: 0;
-            font-size: 18px;
-            font-weight: 500;
-        }
+/* Панорамный оверлей */
+#panorama-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.98);
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+}
 
-        #panorama {
-            flex: 1;
-            width: 100%;
-            height: calc(100vh - 60px);
-            position: relative;
-        }
+#panorama-overlay.active {
+    display: flex;
+}
 
-        /* Простой 360° просмотрщик */
-        .panorama-viewer {
-            width: 100%;
-            height: 100%;
-            background-size: auto 100%;
-            background-position: center;
-            background-repeat: repeat-x;
-            cursor: grab;
-            overflow: hidden;
-        }
+/* Header */
+.panorama-header {
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: rgba(0,0,0,0.9);
+    color: white;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
 
-        .panorama-viewer:active {
-            cursor: grabbing;
-        }
+.close-btn {
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: white;
+    font-size: 22px;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s;
+}
 
-        /* Стили для индикатора 360° на хотспотах */
-        .panorama-badge {
-            display: inline-block;
-            background: linear-gradient(45deg, #4CAF50, #45a049);
-            color: white;
-            font-size: 8px;
-            padding: 2px 6px;
-            border-radius: 10px;
-            margin-left: 6px;
-            vertical-align: middle;
-            font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
+.close-btn:hover {
+    background: rgba(255,255,255,0.2);
+}
 
-        /* Стили для хотспотов */
-        .Hotspot {
-            background: rgba(255, 255, 255, 0.85);
-            border-radius: 8px;
-            border: none;
-            box-sizing: border-box;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            color: rgba(0, 0, 0, 0.9);
-            display: block;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 10px;
-            font-weight: 600;
-            max-width: 200px;
-            overflow-wrap: break-word;
-            padding: 8px 12px;
-            position: absolute;
-            width: max-content;
-            height: max-content;
-            transform: translate3d(-50%, -50%, 0);
-            transition: all 0.3s ease;
-            cursor: pointer;
-            z-index: 10;
-        }
+#panorama-title {
+    font-size: 18px;
+    font-weight: 500;
+}
 
-        .Hotspot:hover {
-            background: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-            transform: translate3d(-50%, -50%, 0) scale(1.05);
-        }
+/* Контейнер под WebGL */
+#panorama-canvas-container {
+    flex: 1;
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 56px);
+}
 
-        .HotspotAnnotation {
-            display: inline-flex;
-            align-items: center;
-        }
+#panorama-canvas-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+}
 
-        /* Стили для экрана загрузки */
-        #loading-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: #f5f5f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            transition: opacity 0.5s;
-        }
+/* Сообщение об ошибке */
+#error-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    text-align: center;
+    display: none;
+}
 
-        #progress-bar {
-            width: 300px;
-            height: 4px;
-            background: #e0e0e0;
-            border-radius: 2px;
-            overflow: hidden;
-        }
+/* Индикатор загрузки */
+.loading-indicator {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 16px;
+    z-index: 10;
+}
 
-        #progress {
-            height: 100%;
-            background: linear-gradient(90deg, #4CAF50, #45a049);
-            width: 0%;
-            transition: width 0.3s;
-        }
+.loading-indicator::after {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 40px;
+    margin: 10px auto;
+    border: 4px solid rgba(255,255,255,0.3);
+    border-top: 4px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
 
-        /* Скрытие сообщения об ошибке AR */
-        .hide {
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s, visibility 0.3s;
-        }
-
-        /* Информационная панель */
-        .info-panel {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-size: 12px;
-            display: none;
-            z-index: 100;
-        }
-
-        .info-panel.show {
-            display: block;
-        }
-        
-        /* Контролы для 360° просмотра */
-        .panorama-controls {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 10px;
-            z-index: 1001;
-        }
-        
-        .control-btn {
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        
-        /* Фикс для body и html */
-        body, html {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            width: 100%;
-            height: 100%;
-        }
-    </style>
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
 </head>
 
+<body>
 
-    <div id="loading-screen">
-        <div id="progress-bar">
-            <div id="progress"></div>
-        </div>
+<!-- MODEL VIEWER -->
+<model-viewer
+    id="model-viewer"
+    src="models/UnityParkOptimized.glb"
+    camera-controls
+    touch-action="none"
+    shadow-intensity="1"
+    field-of-view="45deg"
+    min-camera-orbit="auto auto 5%"
+    camera-orbit="-10deg -45deg 5m"
+    ar
+>
+    <button slot="ar-button">AR-режим</button>
+    
+    <button
+        class="Hotspot"
+        slot="hotspot-1"
+        data-position="-0.9073734110678933m 0.1507534682750702m -0.2609223591867831m"
+        data-normal="0m 1m 0m"
+        data-target="-0.9073734110678933m 0.1507534682750702m -0.2609223591867831m"
+        data-orbit="0deg 30deg 0.6m"
+        data-visibility-attribute="visible"
+        data-panorama="https://pannellum.org/images/alma.jpg"
+    >
+        Конгрессно-выставочный центр <span>360°</span>
+    </button>
+</model-viewer>
+
+<!-- PANORAMA OVERLAY -->
+<div id="panorama-overlay">
+    <div class="panorama-header">
+        <span id="panorama-title">360° Панорама</span>
+        <button id="close-panorama" class="close-btn">✕</button>
     </div>
-
-    <!-- Контейнер для 360° панорам - УПРОЩЕННАЯ ВЕРСИЯ -->
-    <div id="panorama-viewer" class="panorama-container">
-        <div class="panorama-header">
-            <h3 id="panorama-title">360° Панорама</h3>
-            <button id="close-panorama" class="close-btn">✕</button>
-        </div>
-        <div id="panorama" class="panorama-viewer"></div>
-        <div class="panorama-controls">
-            <button id="pan-left" class="control-btn">←</button>
-            <button id="pan-right" class="control-btn">→</button>
-            <button id="reset-view" class="control-btn">Сбросить</button>
-        </div>
+    <div id="panorama-canvas-container">
+        <div class="loading-indicator"></div>
+        <div id="error-message"></div>
     </div>
+</div>
 
-    <model-viewer id="model-viewer" src="models/UnityParkOptimized.glb" alt="A 3D model Unity park"
-        ar-modes="scene-viewer quick-look" ar-scale="auto" camera-controls touch-action="none" shadow-intensity="1"
-        interpolation-decay="200" min-camera-orbit="auto auto 5%" camera-orbit="-10deg -45deg 5m"
-        camera-target="0m 0m 0m" field-of-view="45deg" ar>
+<!-- MAIN SCRIPT -->
+<script type="module">
+import * as THREE from 'https://unpkg.com/three@0.159.0/build/three.module.js';
 
-        <button id="ar-button" slot="ar-button">AR-режим</button>
-        <div id="error" class="hide">AR is not supported on this device</div>
+// КЛАСС ДЛЯ 360° ПАНОРАМЫ
+// КЛАСС ДЛЯ 360° ПАНОРАМЫ
+class PanoramaViewer {
+    constructor(containerId) {
+        // Элемент-контейнер
+        this.container = document.getElementById(containerId);
 
-        <button class="Hotspot" slot="hotspot-1"
-            data-position="-0.9073734110678933m 0.1507534682750702m -0.2609223591867831m" data-normal="0m 1m 0m"
-            data-target="-0.9073734110678933m 0.1507534682750702m -0.2609223591867831m" data-orbit="0deg 30deg 0.6m"
-            data-visibility-attribute="visible" data-panorama="panoramas/congress.jpg">
-            <div class="HotspotAnnotation">Конгрессно-выставочный центр<span class="panorama-badge">360°</span></div>
-        </button>
+        // Сцена
+        this.scene = new THREE.Scene();
 
-    </model-viewer>
+        // Камера
+        this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+        this.camera.position.set(0, 0, 0.1); // небольшое смещение вперед
 
-    <!-- Информационная панель -->
-    <div id="info-panel" class="info-panel">
-        Кликните на метку для просмотра объекта. Значок 360° указывает на наличие панорамного обзора.
-    </div>
+        // Создаем pivot-группу для горизонтального вращения
+        this.cameraPivot = new THREE.Object3D();
+        this.cameraPivot.add(this.camera);
+        this.scene.add(this.cameraPivot);
 
-    <script>
-        // Инициализация элементов DOM
-        let modelViewer = document.querySelector('#model-viewer');
-        const loadingScreen = document.querySelector('#loading-screen');
-        const progressBar = document.querySelector('#progress');
-        const panoramaContainer = document.getElementById('panorama-viewer');
-        const panoramaView = document.getElementById('panorama');
-        const closePanoramaBtn = document.getElementById('close-panorama');
-        const panoramaTitle = document.getElementById('panorama-title');
-        const infoPanel = document.getElementById('info-panel');
-        
-        // Элементы управления панорамой
-        const panLeftBtn = document.getElementById('pan-left');
-        const panRightBtn = document.getElementById('pan-right');
-        const resetViewBtn = document.getElementById('reset-view');
-        
-        // Переменные для управления панорамой
-        let currentPanoramaUrl = '';
-        let currentPanPosition = 0;
-        let isPanoramaOpen = false;
-        let isDragging = false;
-        let lastMouseX = 0;
-        
-        // Сохраняем начальные значения камеры
-        const defaultCameraTarget = modelViewer.cameraTarget;
-        const defaultCameraOrbit = modelViewer.cameraOrbit;
-        const defaultFieldOfView = modelViewer.fieldOfView;
-        
-        // Переменные для отслеживания, какая кнопка была нажата
-        let lastClickedHotspot = null;
+        // Рендерер и меш пока null
+        this.renderer = null;
+        this.sphere = null;
 
-        // Обработка загрузки модели
-        modelViewer.addEventListener('progress', (event) => {
-            const progress = event.detail.totalProgress;
-            progressBar.style.width = `${progress * 100}%`;
+        // Переменные для управления мышью/тачем
+        this.isDragging = false;
+        this.previousMousePosition = { x: 0, y: 0 };
+
+        // Инициализация рендерера, света и сцены
+        this.init();
+
+        // Подключение событий мыши/тача
+        this.bindEvents();
+
+        // Анимация рендера
+        this.animate();
+    }
+    
+    init() {
+        // Создаем рендерер
+        this.renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            alpha: true 
         });
-
-        modelViewer.addEventListener('load', () => {
-            loadingScreen.style.opacity = '0';
-            setTimeout(() => {
-                loadingScreen.style.display = 'none';
-                // Показываем информационную панель на 5 секунд
-                infoPanel.classList.add('show');
-                setTimeout(() => {
-                    infoPanel.classList.remove('show');
-                }, 5000);
-            }, 500);
-        });
-
-        // Обработка AR режима
-        document.querySelector("#model-viewer").addEventListener('ar-status', (event) => {
-            if (event.detail.status === 'failed') {
-                const error = document.querySelector("#error");
-                error.classList.remove('hide');
-                error.addEventListener('transitionend', (event) => {
-                    error.classList.add('hide');
+        
+        this.updateSize();
+        this.container.appendChild(this.renderer.domElement);
+        
+        // Настраиваем камеру
+        this.camera.position.set(0, 0, 0.1);
+        
+        // Добавляем свет
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+        this.scene.add(ambientLight);
+        
+        console.log('PanoramaViewer initialized');
+    }
+    
+    updateSize() {
+        const width = this.container.clientWidth;
+        const height = this.container.clientHeight;
+        
+        this.camera.aspect = width / height;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(width, height);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+    }
+    
+    loadPanorama(url) {
+        console.log('Loading panorama from:', url);
+        
+        // Показываем индикатор загрузки
+        this.showLoading();
+        
+        const loader = new THREE.TextureLoader();
+        
+        loader.load(
+            url,
+            (texture) => {
+                console.log('Panorama texture loaded successfully');
+                
+                // Скрываем индикатор загрузки
+                this.hideLoading();
+                
+                // Очищаем предыдущую сферу
+                if (this.sphere) {
+                    this.scene.remove(this.sphere);
+                }
+                
+                // Настраиваем текстуру
+                texture.colorSpace = THREE.SRGBColorSpace;
+                texture.wrapS = THREE.RepeatWrapping;
+                texture.repeat.x = -1; // Инвертируем для правильной ориентации
+                
+                // Создаем геометрию сферы
+                const geometry = new THREE.SphereGeometry(100, 60, 40);
+                
+                // Инвертируем нормали (чтобы текстура отображалась внутри сферы)
+                geometry.scale(-1, 1, 1);
+                
+                // Создаем материал
+                const material = new THREE.MeshBasicMaterial({
+                    map: texture,
+                    side: THREE.DoubleSide
                 });
+                
+                // Создаем меш
+                this.sphere = new THREE.Mesh(geometry, material);
+                
+                // Добавляем в сцену
+                this.scene.add(this.sphere);
+                
+                console.log('Panorama sphere created and added to scene');
+            },
+            (xhr) => {
+                // Прогресс загрузки
+                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+            },
+            (error) => {
+                console.error('Error loading panorama:', error);
+                this.hideLoading();
+                this.showError('Ошибка загрузки панорамы. Проверьте URL и CORS.');
             }
+        );
+    }
+    
+    showLoading() {
+        const loading = this.container.querySelector('.loading-indicator');
+        if (loading) {
+            loading.style.display = 'block';
+        }
+        
+        const error = this.container.querySelector('#error-message');
+        if (error) {
+            error.style.display = 'none';
+        }
+    }
+    
+    hideLoading() {
+        const loading = this.container.querySelector('.loading-indicator');
+        if (loading) {
+            loading.style.display = 'none';
+        }
+    }
+    
+    showError(message) {
+        const error = this.container.querySelector('#error-message');
+        if (error) {
+            error.textContent = message;
+            error.style.display = 'block';
+        }
+    }
+    
+    bindEvents() {
+        // Обработка мыши
+        this.container.addEventListener('mousedown', (e) => {
+            this.isDragging = true;
+            this.previousMousePosition = {
+                x: e.clientX,
+                y: e.clientY
+            };
+            this.container.style.cursor = 'grabbing';
         });
-
-        // ПРОСТАЯ ФУНКЦИЯ ДЛЯ 360° ПАНОРАМЫ
-        function showPanorama(panoramaUrl, title) {
-            if (!panoramaUrl) return;
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!this.isDragging) return;
             
-            currentPanoramaUrl = panoramaUrl;
-            currentPanPosition = 0;
+            const deltaMove = {
+                x: e.clientX - this.previousMousePosition.x,
+                y: e.clientY - this.previousMousePosition.y
+            };
             
-            // Показываем контейнер
-            panoramaContainer.classList.add('active');
-            panoramaTitle.textContent = title + ' - 360° Панорама';
-            isPanoramaOpen = true;
+            // Вращаем камеру
+            this.rotateCamera(deltaMove.x * 0.005, deltaMove.y * 0.005);
             
-            // Устанавливаем изображение как фон
-            panoramaView.style.backgroundImage = `url('${panoramaUrl}')`;
-            panoramaView.style.backgroundPosition = 'center';
+            this.previousMousePosition = {
+                x: e.clientX,
+                y: e.clientY
+            };
+        });
+        
+        document.addEventListener('mouseup', () => {
+            this.isDragging = false;
+            this.container.style.cursor = 'grab';
+        });
+        
+        // Обработка сенсорного ввода
+        this.container.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                this.isDragging = true;
+                this.previousMousePosition = {
+                    x: e.touches[0].clientX,
+                    y: e.touches[0].clientY
+                };
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        this.container.addEventListener('touchmove', (e) => {
+            if (!this.isDragging || e.touches.length !== 1) return;
             
-            // Добавляем информацию в консоль для отладки
-            console.log('Загружаем панораму:', panoramaUrl);
-        }
-
-        // Функция для закрытия 360° панорамы
-        function closePanorama() {
-            panoramaContainer.classList.remove('active');
-            isPanoramaOpen = false;
-            currentPanoramaUrl = '';
-            panoramaView.style.backgroundImage = '';
-        }
-
-        // Функция поворота панорамы
-        function rotatePanorama(delta) {
-            currentPanPosition += delta;
-            // Ограничиваем диапазон от -180 до 180 градусов
-            while (currentPanPosition > 180) currentPanPosition -= 360;
-            while (currentPanPosition < -180) currentPanPosition += 360;
+            const deltaMove = {
+                x: e.touches[0].clientX - this.previousMousePosition.x,
+                y: e.touches[0].clientY - this.previousMousePosition.y
+            };
             
-            // Применяем смещение
-            panoramaView.style.backgroundPosition = `${50 + currentPanPosition / 3.6}% center`;
-        }
+            this.rotateCamera(deltaMove.x * 0.01, deltaMove.y * 0.01);
+            
+            this.previousMousePosition = {
+                x: e.touches[0].clientX,
+                y: e.touches[0].clientY
+            };
+            
+            e.preventDefault();
+        }, { passive: false });
+        
+        this.container.addEventListener('touchend', () => {
+            this.isDragging = false;
+        });
+        
+        // Изменение размера окна
+        window.addEventListener('resize', () => {
+            this.updateSize();
+        });
+    }
+    
+    rotateCamera(deltaX, deltaY) {
+    if (!this.sphere) return;
 
-        // Функция сброса вида
-        function resetPanoramaView() {
-            currentPanPosition = 0;
-            panoramaView.style.backgroundPosition = 'center';
-        }
+    const rotationSpeed = 0.5;
 
-        // Обработчик клика на хотспот
-        function annotationClicked(annotation) {
-            // Если открыта панорама, сначала закрываем её
-            if (isPanoramaOpen) {
-                closePanorama();
+    // Горизонтальное вращение через pivot
+    this.cameraPivot.rotation.y += deltaX * rotationSpeed;
+
+    // Вертикальное вращение камеры
+    this.camera.rotation.x += deltaY * -1 * rotationSpeed;
+
+    // Ограничение вертикального наклона (чтобы не перевернуться)
+    this.camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.camera.rotation.x));
+
+    // Дополнительно можно нормализовать Y, но теперь pivot контролирует горизонталь
+}
+    
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        this.renderer.render(this.scene, this.camera);
+    }
+}
+
+// ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('Page loaded, initializing...');
+    
+    // Элементы DOM
+    const overlay = document.getElementById('panorama-overlay');
+    const closeBtn = document.getElementById('close-panorama');
+    const panoramaViewer = new PanoramaViewer('panorama-canvas-container');
+    
+    // Назначаем обработчики клика на хотспоты
+    document.querySelectorAll('.Hotspot').forEach(hotspot => {
+        hotspot.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            const panoramaUrl = hotspot.dataset.panorama;
+            if (!panoramaUrl) {
+                console.warn('No panorama URL specified for hotspot');
                 return;
             }
             
-            const dataset = annotation.dataset;
-            const panoramaUrl = dataset.panorama;
+            console.log('Opening panorama:', panoramaUrl);
             
-            // Проверяем, есть ли панорама для этого хотспота
-            if (panoramaUrl) {
-                // Показываем 360° панораму
-                const title = annotation.querySelector('.HotspotAnnotation').textContent;
-                showPanorama(panoramaUrl, title.replace('360°', '').trim());
-            } else {
-                // Обычная обработка камеры
-                if (lastClickedHotspot === annotation) {
-                    // Если нажата та же самая кнопка, возвращаем камеру в исходное состояние
-                    modelViewer.cameraTarget = defaultCameraTarget;
-                    modelViewer.cameraOrbit = defaultCameraOrbit;
-                    modelViewer.fieldOfView = defaultFieldOfView;
-                    lastClickedHotspot = null;
-                } else {
-                    // Если нажата другая кнопка, приближаем камеру к новой цели
-                    modelViewer.cameraTarget = dataset.target;
-                    modelViewer.cameraOrbit = dataset.orbit;
-                    lastClickedHotspot = annotation;
-                }
-            }
+            // Устанавливаем заголовок
+            const title = hotspot.textContent.replace('360°', '').trim();
+            document.getElementById('panorama-title').textContent = title + ' - 360° Панорама';
+            
+            // Загружаем панораму
+            panoramaViewer.loadPanorama(panoramaUrl);
+            
+            // Показываем оверлей
+            overlay.classList.add('active');
+            
+            // Обновляем размеры при показе
+            setTimeout(() => {
+                panoramaViewer.updateSize();
+            }, 100);
+        });
+    });
+    
+    // Кнопка закрытия
+    closeBtn.addEventListener('click', () => {
+        overlay.classList.remove('active');
+        console.log('Panorama closed');
+    });
+    
+    // Закрытие по клавише ESC
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay.classList.contains('active')) {
+            overlay.classList.remove('active');
         }
+    });
+    
+    // Закрытие по клику вне контента (опционально)
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            overlay.classList.remove('active');
+        }
+    });
+    
+    // Дебаг информация
+    console.log('Hotspots found:', document.querySelectorAll('.Hotspot').length);
+    console.log('Initialization complete');
+});
 
-        // Обработчики мыши для панорамы
-        panoramaView.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            lastMouseX = e.clientX;
-            panoramaView.style.cursor = 'grabbing';
-        });
+// Обработка ошибок загрузки
+window.addEventListener('error', function(e) {
+    console.error('Global error:', e.error);
+    console.error('Error in file:', e.filename, 'line:', e.lineno);
+});
 
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging || !isPanoramaOpen) return;
-            
-            const deltaX = e.clientX - lastMouseX;
-            lastMouseX = e.clientX;
-            
-            // Поворачиваем панораму в зависимости от движения мыши
-            rotatePanorama(deltaX * 0.5);
-        });
-
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-            panoramaView.style.cursor = 'grab';
-        });
-
-        // Обработчики для сенсорных устройств
-        panoramaView.addEventListener('touchstart', (e) => {
-            isDragging = true;
-            lastMouseX = e.touches[0].clientX;
-            e.preventDefault();
-        });
-
-        panoramaView.addEventListener('touchmove', (e) => {
-            if (!isDragging || !isPanoramaOpen) return;
-            
-            const deltaX = e.touches[0].clientX - lastMouseX;
-            lastMouseX = e.touches[0].clientX;
-            
-            rotatePanorama(deltaX);
-            e.preventDefault();
-        });
-
-        panoramaView.addEventListener('touchend', () => {
-            isDragging = false;
-        });
-
-        // Обработчики кнопок управления
-        panLeftBtn.addEventListener('click', () => rotatePanorama(-30));
-        panRightBtn.addEventListener('click', () => rotatePanorama(30));
-        resetViewBtn.addEventListener('click', resetPanoramaView);
-
-        // Добавляем обработчики клика для всех хотспотов
-        document.querySelectorAll('.Hotspot').forEach((hotspot) => {
-            hotspot.addEventListener('click', (e) => {
-                e.stopPropagation(); // Предотвращаем всплытие события
-                annotationClicked(hotspot);
-            });
-        });
-
-        // Обработчик закрытия панорамы
-        closePanoramaBtn.addEventListener('click', closePanorama);
-
-        // Закрытие панорамы по нажатию Escape
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && isPanoramaOpen) {
-                closePanorama();
-            }
-        });
-
-        // Закрытие панорамы по клику вне панорамы
-        panoramaContainer.addEventListener('click', (e) => {
-            if (e.target === panoramaContainer) {
-                closePanorama();
-            }
-        });
-
-        // Дополнительная информация при наведении на хотспот
-        document.querySelectorAll('.Hotspot').forEach((hotspot) => {
-            const hasPanorama = hotspot.dataset.panorama;
-            
-            hotspot.addEventListener('mouseenter', () => {
-                if (hasPanorama) {
-                    hotspot.style.background = 'linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(240, 255, 240, 0.95))';
-                }
-            });
-            
-            hotspot.addEventListener('mouseleave', () => {
-                hotspot.style.background = '';
-            });
-        });
-
-        // Инициализация по загрузке страницы
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('Unity Park 3D Viewer loaded with 360° panorama support');
-            console.log('Hotspots with 360° panorama:', 
-                document.querySelectorAll('[data-panorama]').length);
-        });
-
-    </script>
+</script>
 
 </body>
-
 </html>
